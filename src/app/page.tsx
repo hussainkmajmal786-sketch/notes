@@ -8,6 +8,7 @@ import {
   CloseIcon,
   CopyIcon,
   EditIcon,
+  MenuIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
@@ -25,6 +26,7 @@ export default function Home() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [editing, setEditing] = useState<Prompt | "new" | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   function toast(kind: Toast["kind"], msg: string) {
     const id = Date.now() + Math.random();
@@ -79,9 +81,19 @@ export default function Home() {
     }
   }, [activeDir, loadPrompts]);
 
+  // Lock background scroll while the mobile drawer or editor is open.
+  useEffect(() => {
+    const lock = drawerOpen || editing !== null;
+    document.body.style.overflow = lock ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [drawerOpen, editing]);
+
   // Switch directory: reset view filters here, where the change originates,
   // rather than syncing them inside an effect.
   function selectDirectory(id: string) {
+    setDrawerOpen(false);
     if (id === activeDir) return;
     setSearch("");
     setTagFilter(null);
@@ -89,11 +101,15 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (editing === null) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setEditing(null);
+    if (editing === null && !drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (editing !== null) setEditing(null);
+      setDrawerOpen(false);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editing]);
+  }, [editing, drawerOpen]);
 
   const activeDirectory = directories.find((d) => d.id === activeDir) ?? null;
   const activeIndex = directories.findIndex((d) => d.id === activeDir);
@@ -193,9 +209,23 @@ export default function Home() {
 
   return (
     <div id="__app" className="flex h-dvh w-full overflow-hidden">
-      {/* ── Sidebar : the index ── */}
-      <aside className="flex w-[280px] shrink-0 flex-col border-r border-[var(--rule)] bg-[var(--paper-2)]">
-        <div className="px-7 pt-8 pb-6">
+      {/* Scrim behind the mobile drawer */}
+      {drawerOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setDrawerOpen(false)}
+          className="anim-fade fixed inset-0 z-30 bg-[var(--ink)]/40 backdrop-blur-[1px] lg:hidden"
+        />
+      )}
+
+      {/* ── Sidebar : the index (static on desktop, slide-in drawer on mobile) ── */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] max-w-[84vw] shrink-0 flex-col border-r border-[var(--rule)] bg-[var(--paper-2)] transition-transform duration-300 ease-out lg:static lg:z-auto lg:max-w-none lg:translate-x-0 ${
+          drawerOpen ? "translate-x-0 shadow-[var(--shadow-modal)]" : "-translate-x-full lg:shadow-none"
+        }`}
+      >
+        <div className="relative px-7 pt-8 pb-6">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
             Prompt Saver
           </p>
@@ -204,6 +234,14 @@ export default function Home() {
             <br />
             <span className="italic">how you built it</span>
           </h1>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Close menu"
+            className="absolute right-5 top-7 grid h-9 w-9 place-items-center rounded text-[var(--ink-soft)] hover:text-[var(--accent)] lg:hidden"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
         </div>
 
         <div className="flex items-baseline justify-between border-t border-[var(--rule)] px-7 pb-2 pt-4">
@@ -262,7 +300,7 @@ export default function Home() {
                         {dir.name}
                       </button>
                       <div
-                        className={`flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100 ${
+                        className={`flex shrink-0 items-center gap-0.5 transition-opacity duration-200 focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${
                           active ? "text-[var(--paper)]/70" : "text-[var(--ink-faint)]"
                         }`}
                       >
@@ -271,7 +309,7 @@ export default function Home() {
                           onClick={() => renameDirectory(dir)}
                           title="Rename"
                           aria-label={`Rename ${dir.name}`}
-                          className="grid h-6 w-6 place-items-center rounded hover:text-current"
+                          className="grid h-8 w-8 place-items-center rounded hover:text-current lg:h-6 lg:w-6"
                         >
                           <EditIcon className="h-3.5 w-3.5" />
                         </button>
@@ -280,7 +318,7 @@ export default function Home() {
                           onClick={() => removeDirectory(dir)}
                           title="Delete"
                           aria-label={`Delete ${dir.name}`}
-                          className="grid h-6 w-6 place-items-center rounded hover:text-current"
+                          className="grid h-8 w-8 place-items-center rounded hover:text-current lg:h-6 lg:w-6"
                         >
                           <TrashIcon className="h-3.5 w-3.5" />
                         </button>
@@ -302,14 +340,39 @@ export default function Home() {
 
       {/* ── Main : the catalog ── */}
       <main className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar */}
+        <div className="flex items-center gap-3 border-b border-[var(--rule)] bg-[var(--paper-2)] px-4 py-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open menu"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded text-[var(--ink)] hover:text-[var(--accent)]"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+          <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">
+            {activeDirectory ? `Vol. ${String(activeIndex + 1).padStart(2, "0")}` : "Prompt Saver"}
+          </p>
+          {activeDirectory && (
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              aria-label="New entry"
+              className="grid h-10 w-10 shrink-0 place-items-center bg-[var(--ink)] text-[var(--paper)] active:bg-[var(--accent)]"
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
         {activeDirectory ? (
           <>
-            <header className="flex items-end gap-4 border-b border-[var(--rule)] px-10 pb-5 pt-8">
+            <header className="flex flex-col gap-4 border-b border-[var(--rule)] px-5 pb-4 pt-5 sm:px-8 lg:flex-row lg:items-end lg:px-10 lg:pb-5 lg:pt-8">
               <div className="min-w-0 flex-1">
-                <p className="tnum text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">
+                <p className="tnum hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] lg:block">
                   Vol. {String(activeIndex + 1).padStart(2, "0")}
                 </p>
-                <h2 className="font-serif mt-1.5 truncate text-[34px] leading-none tracking-[-0.01em]">
+                <h2 className="font-serif truncate text-[26px] leading-none tracking-[-0.01em] sm:text-[30px] lg:mt-1.5 lg:text-[34px]">
                   {activeDirectory.name}
                 </h2>
                 <p className="tnum mt-2 text-[12px] text-[var(--ink-soft)]">
@@ -319,20 +382,20 @@ export default function Home() {
                   )}
                 </p>
               </div>
-              <div className="relative">
+              <div className="relative w-full lg:w-auto">
                 <SearchIcon className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-faint)]" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search the catalog…"
                   aria-label="Search prompts"
-                  className="h-9 w-64 border-b border-[var(--rule-strong)] bg-transparent pl-6 pr-2 text-[13px] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)]"
+                  className="h-10 w-full border-b border-[var(--rule-strong)] bg-transparent pl-6 pr-2 text-[16px] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)] lg:h-9 lg:w-64 lg:text-[13px]"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => setEditing("new")}
-                className="group flex h-9 items-center gap-1.5 bg-[var(--ink)] px-4 text-[12.5px] font-medium tracking-wide text-[var(--paper)] transition-colors duration-200 hover:bg-[var(--accent)]"
+                className="group hidden h-9 items-center gap-1.5 bg-[var(--ink)] px-4 text-[12.5px] font-medium tracking-wide text-[var(--paper)] transition-colors duration-200 hover:bg-[var(--accent)] lg:flex"
               >
                 <PlusIcon className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
                 New entry
@@ -340,7 +403,7 @@ export default function Home() {
             </header>
 
             {allTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--rule)] px-10 py-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--rule)] px-5 py-3 sm:px-8 lg:px-10">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-faint)]">
                   Subjects
                 </span>
@@ -359,9 +422,9 @@ export default function Home() {
               </div>
             )}
 
-            <section className="flex-1 overflow-y-auto px-10 py-7">
+            <section className="flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:px-10 lg:py-7">
               {loadingPrompts ? (
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-2 2xl:grid-cols-3">
                   {[0, 1, 2, 3].map((i) => (
                     <CardSkeleton key={i} />
                   ))}
@@ -376,7 +439,7 @@ export default function Home() {
                   }}
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-2 2xl:grid-cols-3">
                   {visiblePrompts.map((p, i) => (
                     <PromptCard
                       key={p.id}
@@ -555,13 +618,13 @@ function PromptCard({
             {prompt.title}
           </h3>
         </div>
-        <div className="-mr-1 -mt-1 flex shrink-0 items-center text-[var(--ink-faint)] opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
+        <div className="-mr-1 -mt-1 flex shrink-0 items-center text-[var(--ink-faint)] transition-opacity duration-200 focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
           <button
             type="button"
             onClick={copy}
             title="Copy prompt"
             aria-label="Copy prompt to clipboard"
-            className="grid h-8 w-8 place-items-center rounded transition-colors duration-200 hover:text-[var(--ink)]"
+            className="grid h-9 w-9 place-items-center rounded transition-colors duration-200 hover:text-[var(--ink)] lg:h-8 lg:w-8"
           >
             {copied ? <CheckIcon className="h-4 w-4 text-[var(--accent)]" /> : <CopyIcon className="h-4 w-4" />}
           </button>
@@ -570,7 +633,7 @@ function PromptCard({
             onClick={onEdit}
             title="Edit"
             aria-label="Edit prompt"
-            className="grid h-8 w-8 place-items-center rounded transition-colors duration-200 hover:text-[var(--ink)]"
+            className="grid h-9 w-9 place-items-center rounded transition-colors duration-200 hover:text-[var(--ink)] lg:h-8 lg:w-8"
           >
             <EditIcon className="h-4 w-4" />
           </button>
@@ -579,7 +642,7 @@ function PromptCard({
             onClick={onDelete}
             title="Delete"
             aria-label="Delete prompt"
-            className="grid h-8 w-8 place-items-center rounded transition-colors duration-200 hover:text-[var(--accent)]"
+            className="grid h-9 w-9 place-items-center rounded transition-colors duration-200 hover:text-[var(--accent)] lg:h-8 lg:w-8"
           >
             <TrashIcon className="h-4 w-4" />
           </button>
@@ -646,17 +709,17 @@ function PromptEditor({
 
   return (
     <div
-      className="anim-fade fixed inset-0 z-40 flex items-center justify-center bg-[var(--ink)]/45 p-4 backdrop-blur-[2px]"
+      className="anim-fade fixed inset-0 z-40 flex items-end justify-center bg-[var(--ink)]/45 backdrop-blur-[2px] sm:items-center sm:p-4"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
       aria-label={initial ? "Edit prompt" : "New prompt"}
     >
       <div
-        className="anim-pop flex max-h-[90vh] w-full max-w-2xl flex-col border border-[var(--rule-strong)] bg-[var(--card)] shadow-[var(--shadow-modal)]"
+        className="anim-pop flex max-h-[92dvh] w-full max-w-2xl flex-col border-t border-[var(--rule-strong)] bg-[var(--card)] shadow-[var(--shadow-modal)] sm:max-h-[90vh] sm:border"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-baseline justify-between border-b border-[var(--rule)] px-7 py-5">
+        <header className="flex items-baseline justify-between border-b border-[var(--rule)] px-5 py-4 sm:px-7 sm:py-5">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">
               {initial ? "Revise" : "New entry"}
@@ -676,7 +739,7 @@ function PromptEditor({
           </button>
         </header>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-7 py-6">
+        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
           <Field label="Title" required>
             <input
               autoFocus
@@ -694,7 +757,7 @@ function PromptEditor({
               onChange={(e) => setBody(e.target.value)}
               placeholder="Build me a…"
               rows={11}
-              className="mono w-full resize-y border border-[var(--rule-strong)] bg-[var(--paper)] px-3.5 py-3 text-[12px] leading-[1.6] text-[var(--ink)] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)]"
+              className="mono w-full resize-y border border-[var(--rule-strong)] bg-[var(--paper)] px-3.5 py-3 text-[16px] leading-[1.6] text-[var(--ink)] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)] sm:text-[12px]"
             />
           </Field>
 
@@ -703,16 +766,16 @@ function PromptEditor({
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               placeholder="auth, supabase, ui"
-              className="h-10 w-full border-b border-[var(--rule-strong)] bg-transparent text-[13px] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)]"
+              className="h-11 w-full border-b border-[var(--rule-strong)] bg-transparent text-[16px] outline-none transition-colors duration-200 placeholder:text-[var(--ink-faint)] focus:border-[var(--accent)] sm:h-10 sm:text-[13px]"
             />
           </Field>
         </div>
 
-        <footer className="flex items-center justify-end gap-3 border-t border-[var(--rule)] px-7 py-5">
+        <footer className="flex items-center justify-end gap-3 border-t border-[var(--rule)] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-7 sm:py-5">
           <button
             type="button"
             onClick={onCancel}
-            className="text-[12.5px] font-medium text-[var(--ink-soft)] transition-colors duration-200 hover:text-[var(--ink)]"
+            className="h-11 px-3 text-[13px] font-medium text-[var(--ink-soft)] transition-colors duration-200 hover:text-[var(--ink)] sm:h-auto sm:px-0 sm:text-[12.5px]"
           >
             Cancel
           </button>
@@ -720,7 +783,7 @@ function PromptEditor({
             type="button"
             onClick={submit}
             disabled={!title.trim()}
-            className="h-10 bg-[var(--ink)] px-5 text-[12.5px] font-medium tracking-wide text-[var(--paper)] transition-colors duration-200 hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--ink)]"
+            className="h-11 bg-[var(--ink)] px-5 text-[13px] font-medium tracking-wide text-[var(--paper)] transition-colors duration-200 hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--ink)] sm:h-10 sm:text-[12.5px]"
           >
             {initial ? "Save revisions" : "File entry"}
           </button>
