@@ -1,1 +1,174 @@
 @import "tailwindcss";
+
+:root {
+  /* Paper & ink — warm, archival, not cold zinc */
+  --paper: #f4f0e6;        /* aged paper background */
+  --paper-2: #efe9da;      /* slightly deeper panel */
+  --card: #faf7ef;         /* card surface, lighter than paper */
+  --ink: #1f1b16;          /* near-black warm ink */
+  --ink-soft: #534c42;     /* secondary text */
+  --ink-faint: #8c8377;    /* tertiary / metadata */
+  --rule: #d8d0bf;         /* hairline rules */
+  --rule-strong: #c3b9a4;
+
+  /* Accent — oxblood / library red */
+  --accent: #8a2b1f;
+  --accent-deep: #6f2017;
+  --accent-tint: #f0e2dc;
+
+  --shadow-card: 0 1px 0 rgba(31, 27, 22, 0.04), 0 1px 2px rgba(31, 27, 22, 0.05);
+  --shadow-lift: 0 10px 30px -12px rgba(31, 27, 22, 0.22);
+  --shadow-modal: 0 30px 70px -20px rgba(31, 27, 22, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle paper grain over everything (atmosphere & depth) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+
+#__app {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.font-serif {
+  font-family: var(--font-serif), Georgia, serif;
+}
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "liga" 0;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus ring — oxblood, paper-gapped */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
+  border-radius: 4px;
+}
+
+/* scrollbars */
+*::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #ab9f86;
+  background-clip: padding-box;
+}
+
+/* ---- motion: one orchestrated load, staggered reveals ---- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.anim-rise {
+  animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.anim-fade {
+  animation: fade 320ms ease-out;
+}
+.anim-pop {
+  animation: pop 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.anim-toast {
+  animation: toast-in 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper-2);
+  border-radius: 4px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
