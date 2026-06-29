@@ -60,19 +60,33 @@ export default function Home() {
     [fail]
   );
 
+  // Initial load of directories on mount. State is set asynchronously inside
+  // the fetch callback (the documented data-fetching effect pattern), not
+  // synchronously here — so the cascading-render concern doesn't apply.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDirectories();
   }, [loadDirectories]);
 
+  // Sync prompts with the active directory: fetch when it changes (data fetch
+  // is exactly what effects are for; state lands in the async callback).
   useEffect(() => {
     if (activeDir) {
-      setTagFilter(null);
-      setSearch("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadPrompts(activeDir);
     } else {
       setPrompts([]);
     }
   }, [activeDir, loadPrompts]);
+
+  // Switch directory: reset view filters here, where the change originates,
+  // rather than syncing them inside an effect.
+  function selectDirectory(id: string) {
+    if (id === activeDir) return;
+    setSearch("");
+    setTagFilter(null);
+    setActiveDir(id);
+  }
 
   useEffect(() => {
     if (editing === null) return;
@@ -240,7 +254,7 @@ export default function Home() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setActiveDir(dir.id)}
+                        onClick={() => selectDirectory(dir.id)}
                         className={`min-w-0 flex-1 truncate py-0.5 text-left text-[13.5px] tracking-[-0.005em] ${
                           active ? "font-medium text-[var(--paper)]" : "text-[var(--ink)]"
                         }`}
